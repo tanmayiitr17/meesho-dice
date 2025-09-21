@@ -378,12 +378,12 @@ const SizeSettings = () => {
           </div>
         )}
 
-        <div className="bg-gray-100 rounded-lg p-4 mt-4">
+        {/* <div className="bg-gray-100 rounded-lg p-4 mt-4">
           <h4 className="text-sm font-medium text-gray-800 mb-2">Current Settings (Debug)</h4>
           <pre className="text-xs text-gray-600 overflow-x-auto">
             {JSON.stringify({ measurements, brandSizes }, null, 2)}
           </pre>
-        </div>
+        </div> */}
 
         <div className="mt-8 pb-20">
           <button

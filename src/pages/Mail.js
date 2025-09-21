@@ -696,7 +696,6 @@ const AIAssistant = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-800">Meesho AI</h1>
-              <p className="text-xs text-gray-500">beta</p>
             </div>
           </div>
           <button className="p-2">
