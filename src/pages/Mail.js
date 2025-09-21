@@ -18,10 +18,88 @@ const AIAssistant = () => {
   const [currentRecommendations, setCurrentRecommendations] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [conversationContext, setConversationContext] = useState([]);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [detectedColor, setDetectedColor] = useState(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const detectColorFromImage = (imageUrl) => {
+    const colorMap = {
+      'blue': ['#0000FF', '#4169E1', '#1E90FF', '#87CEEB', '#4682B4', '#5F9EA0', '#6495ED', '#7B68EE'],
+      'beige': ['#F5F5DC', '#F0E68C', '#D2B48C', '#DEB887', '#F4A460', '#CD853F', '#D2691E', '#BC8F8F'],
+      'white': ['#FFFFFF', '#F8F8FF', '#F5F5F5', '#F0F8FF', '#E6E6FA', '#FFF8DC', '#FFFAF0', '#FDF5E6'],
+      'black': ['#000000', '#2F2F2F', '#1C1C1C', '#363636', '#4B0082', '#800080', '#483D8B', '#2E8B57'],
+      'navy': ['#000080', '#191970', '#0000CD', '#4169E1', '#1E90FF', '#00008B', '#2F4F4F', '#008B8B'],
+      'red': ['#FF0000', '#DC143C', '#B22222', '#8B0000', '#FF6347', '#FF4500', '#FF1493', '#C71585']
+    };
+
+    const mockDetectedColors = ['blue', 'beige', 'white', 'black', 'navy', 'red'];
+    return mockDetectedColors[Math.floor(Math.random() * mockDetectedColors.length)];
+  };
+
+  const getColorSuggestions = (detectedColor) => {
+    const colorData = colorCoordinationDatabase[detectedColor];
+    if (!colorData) return { products: [], message: "I couldn't detect a clear color from your image." };
+
+    let suggestedProducts = [];
+    let responseMessage = `I detected ${colorData.primary} color in your image! ${colorData.description}`;
+
+    if (detectedColor === 'blue') {
+      suggestedProducts = productDatabase.colorCoordination.beigePants;
+      responseMessage += " Here are some beige and khaki pants that would look great with your blue shirt:";
+    } else if (detectedColor === 'beige') {
+      suggestedProducts = productDatabase.colorCoordination.blueShirts;
+      responseMessage += " Here are some blue shirts and t-shirts that would complement your beige pants perfectly:";
+    } else if (detectedColor === 'white') {
+      suggestedProducts = productDatabase.colorCoordination.blackPants;
+      responseMessage += " Here are some black pants that would create a classic look with your white shirt:";
+    } else if (detectedColor === 'black') {
+      suggestedProducts = productDatabase.colorCoordination.whiteShirts;
+      responseMessage += " Here are some white shirts that would pair beautifully with your black pants:";
+    } else {
+      suggestedProducts = [...productDatabase.colorCoordination.blueShirts, ...productDatabase.colorCoordination.beigePants];
+      responseMessage += " Here are some versatile options that would work well:";
+    }
+
+    return { products: suggestedProducts, message: responseMessage };
+  };
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageUrl = e.target.result;
+        setUploadedImage(imageUrl);
+        
+        const detectedColor = detectColorFromImage(imageUrl);
+        setDetectedColor(detectedColor);
+        
+        const { products, message } = getColorSuggestions(detectedColor);
+        
+        const userMessage = {
+          type: 'user',
+          content: `I uploaded an image of my ${detectedColor} clothing item`,
+          timestamp: new Date(),
+          id: Date.now()
+        };
+
+        const aiMessage = {
+          type: 'ai',
+          content: message,
+          timestamp: new Date(),
+          id: Date.now() + 1
+        };
+
+        setMessages(prev => [...prev, userMessage, aiMessage]);
+        setCurrentRecommendations(products);
+        setShowSuggestions(false);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   useEffect(() => {
@@ -34,8 +112,50 @@ const AIAssistant = () => {
     "Men's formal wear",
     "Kitchen essentials",
     "Ethnic sarees",
-    "Affordable footwear"
+    "Affordable footwear",
+    "Color coordination help",
+    "Blue shirt with beige pants",
+    "What goes with white shirt"
   ];
+
+  const colorCoordinationDatabase = {
+    'blue': {
+      primary: 'Blue',
+      matches: ['Beige', 'Khaki', 'White', 'Navy', 'Brown', 'Cream'],
+      complementary: 'Orange',
+      description: 'Blue pairs beautifully with neutral tones like beige and khaki'
+    },
+    'beige': {
+      primary: 'Beige',
+      matches: ['Blue', 'Navy', 'Black', 'White', 'Brown', 'Olive'],
+      complementary: 'Blue',
+      description: 'Beige is versatile and works great with blue tones'
+    },
+    'white': {
+      primary: 'White',
+      matches: ['Black', 'Navy', 'Blue', 'Red', 'Pink', 'Gray'],
+      complementary: 'Black',
+      description: 'White is a classic that pairs with almost any color'
+    },
+    'black': {
+      primary: 'Black',
+      matches: ['White', 'Red', 'Pink', 'Blue', 'Gray', 'Beige'],
+      complementary: 'White',
+      description: 'Black is timeless and pairs with bold or neutral colors'
+    },
+    'navy': {
+      primary: 'Navy',
+      matches: ['White', 'Beige', 'Pink', 'Red', 'Yellow', 'Gray'],
+      complementary: 'Orange',
+      description: 'Navy is sophisticated and pairs well with light neutrals'
+    },
+    'red': {
+      primary: 'Red',
+      matches: ['White', 'Black', 'Navy', 'Beige', 'Gray', 'Denim'],
+      complementary: 'Green',
+      description: 'Red makes a bold statement with neutral or dark colors'
+    }
+  };
 
   const productDatabase = {
     'kurtis': [
@@ -49,7 +169,7 @@ const AIAssistant = () => {
         deliveryDate: "Wed, 25 Sept",
         deliveryCharge: "FREE delivery",
         description: "Comfortable cotton kurti with beautiful prints. Perfect for daily wear and office.",
-        image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=300&fit=crop&crop=center",
         category: "Women Clothing",
         sizes: ["S", "M", "L", "XL"],
         colors: ["Pink", "Blue", "White"]
@@ -64,7 +184,7 @@ const AIAssistant = () => {
         deliveryDate: "Thu, 26 Sept",
         deliveryCharge: "FREE delivery",
         description: "Trendy designer kurti with matching dupatta. Premium quality fabric.",
-        image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=300&h=300&fit=crop&crop=center",
         category: "Women Clothing",
         sizes: ["S", "M", "L", "XL", "XXL"],
         colors: ["Black", "Navy", "Maroon"]
@@ -81,7 +201,7 @@ const AIAssistant = () => {
         deliveryDate: "Tue, 24 Sept",
         deliveryCharge: "FREE delivery",
         description: "Premium wireless earphones with noise cancellation and 24-hour battery life.",
-        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop&crop=center",
         category: "Electronics",
         sizes: [],
         colors: ["Black", "White", "Blue"]
@@ -96,7 +216,7 @@ const AIAssistant = () => {
         deliveryDate: "Wed, 25 Sept",
         deliveryCharge: "FREE delivery",
         description: "Durable phone case with built-in stand and card holder. Drop protection guaranteed.",
-        image: "https://images.unsplash.com/photo-1601593346740-925612772716?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1601593346740-925612772716?w=300&h=300&fit=crop&crop=center",
         category: "Electronics",
         sizes: [],
         colors: ["Black", "Blue", "Red", "Clear"]
@@ -113,7 +233,7 @@ const AIAssistant = () => {
         deliveryDate: "Thu, 26 Sept",
         deliveryCharge: "FREE delivery",
         description: "Premium formal shirt perfect for office wear. Wrinkle-free fabric with modern fit.",
-        image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=300&h=300&fit=crop&crop=center",
         category: "Men Clothing",
         sizes: ["S", "M", "L", "XL", "XXL"],
         colors: ["White", "Light Blue", "Pink"]
@@ -128,12 +248,214 @@ const AIAssistant = () => {
         deliveryDate: "Wed, 25 Sept",
         deliveryCharge: "FREE delivery",
         description: "Comfortable cotton t-shirt with premium quality fabric. Perfect for casual wear.",
-        image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=120&h=120&fit=crop",
+        image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop&crop=center",
         category: "Men Clothing",
         sizes: ["S", "M", "L", "XL"],
         colors: ["Navy", "White", "Gray", "Black"]
       }
     ],
+    'colorCoordination': {
+      'blueShirts': [
+        {
+          id: 401,
+          name: "Men's Classic Blue Cotton Shirt",
+          rating: 4.5,
+          reviews: 1243,
+          price: 499,
+          originalPrice: 999,
+          deliveryDate: "Wed, 25 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Classic blue cotton shirt perfect for casual and semi-formal occasions. Pairs beautifully with beige and khaki pants.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcTrcBGEr4cVS-COZ57Hlad253-T6BoyFjEUWOVsovK9LnCVmndGJQVKCBFxj2lcZLZl-N6WVKF3stlMP3n-Clhn_Gg9G9aiRl1FeL2HBNi3utaYirNipM6CeQ",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Blue"],
+          dominantColor: "Blue"
+        },
+        {
+          id: 402,
+          name: "Men's Navy Blue Polo T-Shirt",
+          rating: 4.3,
+          reviews: 892,
+          price: 399,
+          originalPrice: 799,
+          deliveryDate: "Thu, 26 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Premium navy blue polo t-shirt with comfortable fit. Great for casual outings and pairs well with light-colored bottoms.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRNBx2HfJD3e4FdhU-0bPU3rB1rngx-wel9Fls0AWepIWbgooIIauaTcebHfV9NFlHkSiaegKiUoHjz8ENxhOKqzjz-eNVKZqm07gp_Erhbs1RH5E_9Zeeb",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL"],
+          colors: ["Navy Blue"],
+          dominantColor: "Blue"
+        },
+        {
+          id: 403,
+          name: "Men's Light Blue Casual Shirt",
+          rating: 4.4,
+          reviews: 756,
+          price: 449,
+          originalPrice: 899,
+          deliveryDate: "Fri, 27 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Light blue casual shirt with modern fit. Perfect for office and weekend wear. Complements beige and khaki bottoms excellently.",
+          image: "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcT7t9FbCK_vPpRbh33v72mdfSWZd18LfJ0by3B9xxF7eGh7GqkLLPiOWompkpuuTHQL1USP1vpjno4e-EobflhVJ0WvwXvTT9P28u9RWbM-i6rMBPxKy_nNYdil6kzRxkdz93o5hbtEJw&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Light Blue"],
+          dominantColor: "Blue"
+        }
+      ],
+      'beigePants': [
+        {
+          id: 501,
+          name: "Men's Beige Chino Pants",
+          rating: 4.4,
+          reviews: 1156,
+          price: 699,
+          originalPrice: 1299,
+          deliveryDate: "Wed, 25 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Classic beige chino pants with perfect fit. Versatile color that pairs excellently with blue shirts and t-shirts.",
+          image: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcTa6vhHteiBGImNe3hP5GU6inmY_1pjzcj65nJi1tQYP7T0WasStFeCY_43Z1jzBm6US8Xp-_iEoioCy-5LqRCgTrcUdUm_UUglsWHuRrwFdOFTt01sU4r8uNI&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Beige"],
+          dominantColor: "Beige"
+        },
+        {
+          id: 502,
+          name: "Men's Khaki Cargo Pants",
+          rating: 4.2,
+          reviews: 743,
+          price: 599,
+          originalPrice: 1099,
+          deliveryDate: "Thu, 26 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Comfortable khaki cargo pants with multiple pockets. Perfect casual wear that complements blue tops beautifully.",
+          image: "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcRyv8v7GllKoSbuoonWXVjZcwsRkO1NhaJUrIJBKGLlg5wEsjvAHDbujnNgmy8tZCHlMK-Uond8qOoLjRPiKO4Ov_dMsbISlo3dAF4vqIRnf7wBO0yYAdc-2A8&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL"],
+          colors: ["Khaki"],
+          dominantColor: "Beige"
+        },
+        {
+          id: 503,
+          name: "Men's Light Beige Trousers",
+          rating: 4.3,
+          reviews: 892,
+          price: 649,
+          originalPrice: 1199,
+          deliveryDate: "Fri, 27 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Light beige formal trousers with modern cut. Perfect for business casual and pairs beautifully with blue shirts.",
+          image: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcSPEvkNB7M2PB2To2zhgmHOo4VrKD3wok7dzpZwJeWcLTvrVYBV1P-nV6OvkWIeeM9E1y-6Q-8th0vLmVcjjW-2-VWDMZPRmtVCdQTRu0rOJln1RXlUf0QXXVYei_9S_RMC0o1jJLub0g&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Light Beige"],
+          dominantColor: "Beige"
+        }
+      ],
+      'whiteShirts': [
+        {
+          id: 601,
+          name: "Men's Crisp White Formal Shirt",
+          rating: 4.6,
+          reviews: 1456,
+          price: 599,
+          originalPrice: 1199,
+          deliveryDate: "Wed, 25 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Crisp white formal shirt with premium cotton fabric. Classic style that pairs with any color pants.",
+          image: "https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcRY44D2fqrrJ3q4SkilevNTzJ7sEqfNBajtNabzw4laAD0rX2Wk1ky4WHF97o-slkrr4kjnrnte-Z6_XC1X1Az6vzEWbxTHgLNH9TdbgE6U2TSmts0dj18x",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["White"],
+          dominantColor: "White"
+        },
+        {
+          id: 602,
+          name: "Men's White Cotton T-Shirt",
+          rating: 4.1,
+          reviews: 987,
+          price: 299,
+          originalPrice: 599,
+          deliveryDate: "Thu, 26 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Essential white cotton t-shirt with comfortable fit. Versatile basic that works with any bottom color.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRby_44_W60tW5bKZ9tTCEgIG-Q3RALPWiTQ1Vqh5Nx-ADxTy30TNQLtGGhL8wCdI8cmuKhwz7f2qasQ4V7cgWmLzMQ52Mx-gkFYu3I64icyerlVU_Bc_R50w&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL"],
+          colors: ["White"],
+          dominantColor: "White"
+        },
+        {
+          id: 603,
+          name: "Men's White Polo Shirt",
+          rating: 4.4,
+          reviews: 1123,
+          price: 399,
+          originalPrice: 799,
+          deliveryDate: "Fri, 27 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Classic white polo shirt with premium cotton blend. Perfect for smart casual occasions and pairs with any color pants.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRcItNK1q9hiU2sX31SveUjcE2iX4Y-Mh49gHdaZltSKYmlaGjGQ96INa1LCALuu5dD9c31FZ-OQAaAdGtS7CWkPLSoXtN3_AaULWLYDWeJ6j0tdWKnIDuxaAPOaSylecuUaj9sW2kZ&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["White"],
+          dominantColor: "White"
+        }
+      ],
+      'blackPants': [
+        {
+          id: 701,
+          name: "Men's Black Formal Trousers",
+          rating: 4.5,
+          reviews: 1234,
+          price: 799,
+          originalPrice: 1499,
+          deliveryDate: "Wed, 25 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Classic black formal trousers with perfect tailoring. Pairs beautifully with white and colored shirts.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRsSFt757Egv0Srw_OULrmpLCJhlFpX2kSY_3X41IVvCSfpuUJroMN6VFUoaDflDPSplpjerChADv4JLRvwSIKnXP8NSl-Nd1ss3dXvgq9Buv-jxULadHdGJmTyHvCM8-KAn4xCpHs&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Black"],
+          dominantColor: "Black"
+        },
+        {
+          id: 702,
+          name: "Men's Black Jeans",
+          rating: 4.3,
+          reviews: 876,
+          price: 499,
+          originalPrice: 999,
+          deliveryDate: "Thu, 26 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Stylish black jeans with comfortable fit. Perfect casual wear that complements any colored top.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRfBkNTx-shJcpUHugzp5lNVObU3aHAR_j7mMjCa5yN2SMTR5BDu4UJGeOxgUxbQlC6HwJSKO-N5wtUQOmUc0HBSoc0L873SOLm2gQXPOHl0ZotiwI9u9-2vQ&usqp=CAc",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL"],
+          colors: ["Black"],
+          dominantColor: "Black"
+        },
+        {
+          id: 703,
+          name: "Men's Black Chino Pants",
+          rating: 4.4,
+          reviews: 1023,
+          price: 599,
+          originalPrice: 1199,
+          deliveryDate: "Fri, 27 Sept",
+          deliveryCharge: "FREE delivery",
+          description: "Versatile black chino pants with modern fit. Perfect for both casual and semi-formal occasions. Pairs excellently with white shirts.",
+          image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRp5_FGDKHZp2_S4jM87U_jnSMtsAKj3oAhuMOktbiAHjyMShFDy149HaV7wrOgX5wSoD_pprFakFMBzCHP54gFD5L4HskDjcYGqUc-y3gWY0BR7hWnikc-",
+          category: "Men Clothing",
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          colors: ["Black"],
+          dominantColor: "Black"
+        }
+      ]
+    },
     'kitchen': [
       {
         id: 401,
@@ -145,7 +467,7 @@ const AIAssistant = () => {
         deliveryDate: "Fri, 27 Sept",
         deliveryCharge: "FREE delivery",
         description: "Airtight storage containers set for kitchen organization. BPA-free plastic material.",
-        image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=120&h=120&fit=crop",
+        image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcRZ3mB5CfmTaGLuymDKAhJLh-jziqMi_QUKeBrHZlyA7f1PF0eAN9cRrqoEoteYeBhh-VyqqvZ_9yx_xM4Ab1FQodJViqGnS1caCI-BvD75bmJfBKnZ2WMnhh5JhusO&usqp=CAc",
         category: "Home & Kitchen",
         sizes: [],
         colors: ["Clear", "Blue", "Green"]
@@ -160,7 +482,7 @@ const AIAssistant = () => {
         deliveryDate: "Thu, 26 Sept",
         deliveryCharge: "FREE delivery",
         description: "Multi-purpose hand blender for all your kitchen needs. Easy to use and clean.",
-        image: "https://images.unsplash.com/photo-1565814329452-e1efa11c5b89?w=120&h=120&fit=crop",
+        image: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcQALptmOVCxt55b3d8Tgt10O7gn9BG1FrY9j3bPtJtWt_lLtjPuwJzOSmOxPfaNoW2SmOpVAi3E3svo6D6Llof86dl576bWUgAXbsBX5Vkzfnds_sReoyf3h7i5088ZslCO2AK_uKq8ePw&usqp=CAc",
         category: "Home & Kitchen",
         sizes: [],
         colors: ["White", "Red", "Black"]
@@ -177,7 +499,7 @@ const AIAssistant = () => {
         deliveryDate: "Sat, 28 Sept",
         deliveryCharge: "FREE delivery",
         description: "Beautiful traditional Banarasi silk saree perfect for festivals and weddings.",
-        image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=120&h=120&fit=crop",
+        image: "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcTJzWiWFmqyJFyYrOPCFexcUo0xj6g61yrpHt5D8lCWm0lALvGteN879QqBHaEtOyHoM1j04tFXZFmXBVd2p6NqGtuT8VVVoeF1ITyZ1VWOVawzjJvf439AWKo&usqp=CAc",
         category: "Women Clothing",
         sizes: ["Free Size"],
         colors: ["Red", "Golden", "Green", "Blue"]
@@ -192,7 +514,7 @@ const AIAssistant = () => {
         deliveryDate: "Fri, 27 Sept",
         deliveryCharge: "FREE delivery",
         description: "Premium designer saree with intricate work. Perfect for special occasions.",
-        image: "https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=120&h=120&fit=crop",
+        image: "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQr9RKTXrne-0Id_DUEC9E9AEkocBqEo2jhsXLUobbs_DJrTTJht5VXmNVn8YPznqOd6AJAwoc79BtLtVa8NDq9DxMQzuRhhxP5meJYMuwHASr7RS-F2sWnTXs&usqp=CAc",
         category: "Women Clothing",
         sizes: ["Free Size"],
         colors: ["Maroon", "Navy", "Purple", "Pink"]
@@ -251,7 +573,22 @@ const AIAssistant = () => {
     }
 
 
-    if (queryLower.includes('kurti')) {
+    if (queryLower.includes('color') || queryLower.includes('coordinate') || queryLower.includes('match') || queryLower.includes('pair')) {
+      responseText = "I can help you with color coordination! Upload an image of your clothing item and I'll suggest matching colors. You can also ask me about specific color combinations like 'blue shirt with beige pants' or 'what goes with white shirt'.";
+      recommendedProducts = [];
+    } else if (queryLower.includes('blue') && (queryLower.includes('shirt') || queryLower.includes('tshirt') || queryLower.includes('t-shirt'))) {
+      recommendedProducts = productDatabase.colorCoordination.beigePants;
+      responseText = "Great choice! Blue shirts look fantastic with beige and khaki pants. Here are some perfect matches:";
+    } else if (queryLower.includes('beige') && (queryLower.includes('pant') || queryLower.includes('trouser'))) {
+      recommendedProducts = productDatabase.colorCoordination.blueShirts;
+      responseText = "Beige pants are so versatile! They pair beautifully with blue shirts and t-shirts. Check these out:";
+    } else if (queryLower.includes('white') && (queryLower.includes('shirt') || queryLower.includes('tshirt') || queryLower.includes('t-shirt'))) {
+      recommendedProducts = productDatabase.colorCoordination.blackPants;
+      responseText = "White shirts are classic! They look great with black pants for a timeless look:";
+    } else if (queryLower.includes('black') && (queryLower.includes('pant') || queryLower.includes('trouser'))) {
+      recommendedProducts = productDatabase.colorCoordination.whiteShirts;
+      responseText = "Black pants are essential! They pair perfectly with white shirts for a clean, professional look:";
+    } else if (queryLower.includes('kurti')) {
       recommendedProducts = productDatabase.kurtis;
       if (context.length > 0) {
         responseText = "I see you're interested in kurtis! Here are more beautiful options:";
@@ -386,7 +723,7 @@ const AIAssistant = () => {
               ))}
             </div>
             <div className="mt-3 text-xs text-gray-500 text-center">
-              💡 You can also ask: "Show me discounted items", "What's trending?", "Help me choose"
+              💡 You can also ask: "Show me discounted items", "What's trending?", "Help me choose", "Color coordination", or upload an image for color matching
             </div>
           </div>
         )}
@@ -548,6 +885,35 @@ const AIAssistant = () => {
 
 
       <div className="bg-white border-t border-gray-200 p-4">
+        {uploadedImage && (
+          <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <img
+                src={uploadedImage}
+                alt="Uploaded clothing"
+                className="w-16 h-16 object-cover rounded-lg"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-800">
+                  {detectedColor ? `Detected: ${detectedColor.charAt(0).toUpperCase() + detectedColor.slice(1)}` : 'Processing...'}
+                </p>
+                <p className="text-xs text-gray-500">Upload another image to try different colors</p>
+              </div>
+              <button
+                onClick={() => {
+                  setUploadedImage(null);
+                  setDetectedColor(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center space-x-3">
           <div className="flex-1 relative">
             <input
@@ -559,6 +925,21 @@ const AIAssistant = () => {
               className="w-full px-4 py-3 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-meesho-pink focus:border-meesho-pink"
             />
           </div>
+          
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <div className="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </label>
+          
           <button
             onClick={handleSendMessage}
             disabled={!inputText.trim()}
@@ -606,7 +987,7 @@ const AIAssistant = () => {
         
         <div className="text-center mt-2">
           <p className="text-xs text-gray-500">
-            Meesho AI can help you find products, compare prices, and get shopping advice
+            Meesho AI can help you find products, compare prices, get shopping advice, and suggest color coordination
           </p>
         </div>
       </div>
